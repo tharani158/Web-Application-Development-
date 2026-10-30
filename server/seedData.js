@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const Provider = require('./models/Provider');
 const Schedule = require('./models/Schedule');
 const User = require('./models/User');
-const { getUpcomingWeekdays } = require('./utils/availability');
+const { getUpcomingDates } = require('./utils/availability');
 
 const seedData = async () => {
   try {
@@ -36,28 +36,32 @@ const seedData = async () => {
 
     }
 
-    // Every provider without future availability gets the next five weekdays.
-    // Dates are stored at UTC midnight so date-only values remain stable in the UI.
-    const dates = getUpcomingWeekdays();
-    const today = new Date(dates[0]);
-    today.setUTCHours(0, 0, 0, 0);
+    // Fill every missing date in the next 30 days. Dates use UTC midnight so
+    // date-only values remain stable in the UI regardless of server timezone.
+    const dates = getUpcomingDates();
+    const endDate = new Date(dates[dates.length - 1]);
+    endDate.setUTCDate(endDate.getUTCDate() + 1);
 
     const providers = await Provider.find().select('_id');
     const newSchedules = [];
     for (const provider of providers) {
-      const hasFutureSchedule = await Schedule.exists({ providerId: provider._id, availableDate: { $gte: today } });
-      if (!hasFutureSchedule) {
-        dates.forEach((availableDate) => newSchedules.push({
+      const existingSchedules = await Schedule.find({
+        providerId: provider._id,
+        availableDate: { $gte: dates[0], $lt: endDate },
+      }).select('availableDate').lean();
+      const existingDates = new Set(existingSchedules.map((schedule) => schedule.availableDate.toISOString().slice(0, 10)));
+      dates.forEach((availableDate) => {
+        if (!existingDates.has(availableDate.toISOString().slice(0, 10))) newSchedules.push({
           providerId: provider._id,
           availableDate,
           startTime: '09:00',
           endTime: '17:00',
-        }));
-      }
+        });
+      });
     }
     if (newSchedules.length) {
       await Schedule.insertMany(newSchedules);
-      console.log(`Seeded ${newSchedules.length} weekday availability entries.`);
+      console.log(`Seeded ${newSchedules.length} daily availability entries.`);
     }
 
     const { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME = 'System Administrator' } = process.env;

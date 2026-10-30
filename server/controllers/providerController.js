@@ -1,7 +1,7 @@
 const Provider = require('../models/Provider');
 const User = require('../models/User');
 const Schedule = require('../models/Schedule');
-const { getUpcomingWeekdays } = require('../utils/availability');
+const { getUpcomingDates } = require('../utils/availability');
 
 const getProviders = async (req, res, next) => {
   try {
@@ -29,7 +29,7 @@ const createProvider = async (req, res, next) => {
     const { providerName, specialization, email, phone, description, profileImage } = req.body;
     const provider = await Provider.create({ providerName, specialization, email: email.trim().toLowerCase(), phone, description, profileImage });
     try {
-      await Schedule.insertMany(getUpcomingWeekdays().map((availableDate) => ({
+      await Schedule.insertMany(getUpcomingDates().map((availableDate) => ({
         providerId: provider._id,
         availableDate,
         startTime: '09:00',
