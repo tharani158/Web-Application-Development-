@@ -25,6 +25,7 @@ const providerSchema = new mongoose.Schema(
     },
     description: {
       type: String,
+      required: [true, 'Provider description is required'],
       trim: true,
     },
     profileImage: {

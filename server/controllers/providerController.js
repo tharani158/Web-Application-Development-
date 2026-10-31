@@ -2,6 +2,7 @@ const Provider = require('../models/Provider');
 const User = require('../models/User');
 const Schedule = require('../models/Schedule');
 const { getUpcomingDates } = require('../utils/availability');
+const { defaultProviderDescription } = require('../utils/providerDescription');
 
 const getProviders = async (req, res, next) => {
   try {
@@ -27,7 +28,14 @@ const getProviderById = async (req, res, next) => {
 const createProvider = async (req, res, next) => {
   try {
     const { providerName, specialization, email, phone, description, profileImage } = req.body;
-    const provider = await Provider.create({ providerName, specialization, email: email.trim().toLowerCase(), phone, description, profileImage });
+    const provider = await Provider.create({
+      providerName,
+      specialization,
+      email: email.trim().toLowerCase(),
+      phone,
+      description: description?.trim() || defaultProviderDescription(specialization),
+      profileImage,
+    });
     try {
       await Schedule.insertMany(getUpcomingDates().map((availableDate) => ({
         providerId: provider._id,
@@ -58,6 +66,9 @@ const updateProvider = async (req, res, next) => {
       : null;
     if (linkedUser && await User.exists({ email: updates.email, _id: { $ne: linkedUser._id } })) {
       return res.status(409).json({ message: 'Email is already in use by a user account' });
+    }
+    if (updates.description !== undefined && !updates.description.trim()) {
+      updates.description = defaultProviderDescription(updates.specialization || currentProvider.specialization);
     }
     Object.assign(currentProvider, updates);
     await currentProvider.save();
