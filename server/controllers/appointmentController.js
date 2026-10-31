@@ -149,7 +149,17 @@ const updateAppointment = async (req, res, next) => {
     const updates = {};
 
     if (req.user.role === 'admin') {
-      for (const field of ['appointmentStatus', 'appointmentDate', 'appointmentTime', 'notes']) {
+      if (req.body.appointmentStatus !== undefined) {
+        if (appointment.appointmentStatus !== 'pending' || !['approved', 'rejected'].includes(req.body.appointmentStatus)) {
+          return res.status(400).json({ message: 'Admins can approve or reject pending appointments only' });
+        }
+        if (req.body.appointmentStatus === 'rejected' && !req.body.rejectionReason?.trim()) {
+          return res.status(400).json({ message: 'A reason is required when rejecting an appointment' });
+        }
+        updates.appointmentStatus = req.body.appointmentStatus;
+        updates.rejectionReason = req.body.appointmentStatus === 'rejected' ? req.body.rejectionReason.trim() : '';
+      }
+      for (const field of ['appointmentDate', 'appointmentTime', 'notes']) {
         if (req.body[field] !== undefined) {
           updates[field] = req.body[field];
         }
@@ -161,11 +171,7 @@ const updateAppointment = async (req, res, next) => {
         return res.status(403).json({ message: 'Forbidden' });
       }
 
-      const validStatuses = appointment.appointmentStatus === 'pending'
-        ? ['approved', 'rejected']
-        : appointment.appointmentStatus === 'approved'
-          ? ['completed']
-          : [];
+      const validStatuses = appointment.appointmentStatus === 'approved' ? ['completed'] : [];
 
       if (!validStatuses.includes(req.body.appointmentStatus)) {
         return res.status(400).json({ message: 'Invalid appointment status change' });
@@ -183,6 +189,26 @@ const updateAppointment = async (req, res, next) => {
     Object.assign(appointment, updates);
     await appointment.save();
 
+    res.json(appointment);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const rateAppointment = async (req, res, next) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+    if (req.user.role !== 'customer' || !appointment.customerId.equals(req.user._id)) {
+      return res.status(403).json({ message: 'Only the customer who booked this appointment can rate it' });
+    }
+    if (appointment.appointmentStatus !== 'completed') {
+      return res.status(400).json({ message: 'You can rate an appointment after it has been completed' });
+    }
+    if (appointment.rating) return res.status(409).json({ message: 'This appointment has already been rated' });
+    appointment.rating = req.body.rating;
+    appointment.review = req.body.review?.trim() || '';
+    await appointment.save();
     res.json(appointment);
   } catch (error) {
     next(error);
@@ -228,5 +254,6 @@ module.exports = {
   getBookedTimes,
   createAppointment,
   updateAppointment,
+  rateAppointment,
   deleteAppointment,
 };

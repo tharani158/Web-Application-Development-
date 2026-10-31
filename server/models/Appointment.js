@@ -29,6 +29,23 @@ const appointmentSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    rejectionReason: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: '',
+    },
+    rating: {
+      type: Number,
+      min: 1,
+      max: 5,
+    },
+    review: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: '',
+    },
   },
   { timestamps: true }
 );

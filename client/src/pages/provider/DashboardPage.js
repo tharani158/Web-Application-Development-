@@ -90,10 +90,7 @@ function ProviderDashboard() {
                   <td>{new Date(`${new Date(appointment.appointmentDate).toISOString().slice(0, 10)}T00:00:00`).toLocaleDateString()}</td>
                   <td>{appointment.appointmentTime}</td>
                   <td className="text-capitalize">{appointment.appointmentStatus}</td>
-                  <td>{appointment.appointmentStatus === 'pending' ? <div className="d-flex gap-2">
-                    <button className="btn btn-sm btn-primary" onClick={() => changeStatus(appointment._id, 'approved')}>Approve</button>
-                    <button className="btn btn-sm btn-outline-danger" onClick={() => changeStatus(appointment._id, 'rejected')}>Decline</button>
-                  </div> : appointment.appointmentStatus === 'approved' ? <button className="btn btn-sm btn-outline-primary" onClick={() => changeStatus(appointment._id, 'completed')}>Mark complete</button> : null}</td>
+                  <td>{appointment.appointmentStatus === 'pending' ? <span className="small text-muted">Waiting for admin review</span> : appointment.appointmentStatus === 'approved' ? <button className="btn btn-sm btn-outline-primary" onClick={() => changeStatus(appointment._id, 'completed')}>Mark complete</button> : null}</td>
                 </tr>)}</tbody>
               </table></div>
             )}

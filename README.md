@@ -1,7 +1,5 @@
 # Online Appointment Booking System
 
-This repository contains a full-stack MERN application for an online appointment booking system suitable for university-level web application development.
-
 ## Structure
 
 - `client/`: React frontend with Bootstrap 5 UI, routing, and API integration.
@@ -17,6 +15,11 @@ This repository contains a full-stack MERN application for an online appointment
 3. Start development servers:
    - `cd server && npm run dev`
    - `cd client && npm start`
+
+## Admin Login email & password
+
+- `email - stharaniyan158@gmail.com`
+- `password - tharani158`
 
 ## Features
 
