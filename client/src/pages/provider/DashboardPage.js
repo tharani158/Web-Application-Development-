@@ -8,6 +8,9 @@ function ProviderDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dashboardTab, setDashboardTab] = useState('appointments');
+  const [appointmentFilter, setAppointmentFilter] = useState('approved');
+  const [finishingId, setFinishingId] = useState('');
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({ availableDate: '', startTime: '09:00', endTime: '17:00' });
 
@@ -29,12 +32,15 @@ function ProviderDashboard() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const changeStatus = async (id, appointmentStatus) => {
+    setFinishingId(id);
     try {
       await updateAppointment(id, { appointmentStatus });
       setAppointments((current) => current.map((item) => item._id === id ? { ...item, appointmentStatus } : item));
-      toast.success(`Appointment ${appointmentStatus}`);
+      toast.success(appointmentStatus === 'completed' ? 'Appointment marked as finished' : `Appointment ${appointmentStatus}`);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Unable to update appointment');
+    } finally {
+      setFinishingId('');
     }
   };
 
@@ -65,6 +71,11 @@ function ProviderDashboard() {
 
   const pendingCount = appointments.filter((item) => item.appointmentStatus === 'pending').length;
   const approvedCount = appointments.filter((item) => item.appointmentStatus === 'approved').length;
+  const completedAppointments = appointments.filter((item) => item.appointmentStatus === 'completed');
+  const ratedAppointments = completedAppointments.filter((item) => item.rating);
+  const visibleAppointments = appointmentFilter === 'all'
+    ? appointments
+    : appointments.filter((item) => item.appointmentStatus === appointmentFilter);
 
   return (
     <main className="container py-5">
@@ -81,16 +92,31 @@ function ProviderDashboard() {
       <div className="row g-4">
         <div className="col-lg-8">
           <section className="card p-4">
-            <h2 className="h4 mb-3">Appointment requests</h2>
-            {appointments.length === 0 ? <p className="mb-0">There are no appointments to show yet.</p> : (
+            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div className="btn-group" role="tablist" aria-label="Provider dashboard sections">
+                <button type="button" className={`btn btn-sm ${dashboardTab === 'appointments' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setDashboardTab('appointments')}>Appointments</button>
+                <button type="button" className={`btn btn-sm ${dashboardTab === 'ratings' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setDashboardTab('ratings')}>Ratings <span className="badge text-bg-light ms-1">{ratedAppointments.length}</span></button>
+              </div>
+              {dashboardTab === 'appointments' && <div className="btn-group flex-wrap" role="group" aria-label="Filter appointments">
+                {[['approved', `Confirmed (${approvedCount})`], ['pending', `Waiting (${pendingCount})`], ['completed', `Finished (${completedAppointments.length})`], ['rejected', 'Declined'], ['all', 'All']].map(([filter, label]) => <button type="button" key={filter} className={`btn btn-sm ${appointmentFilter === filter ? 'btn-outline-primary active' : 'btn-outline-secondary'}`} onClick={() => setAppointmentFilter(filter)}>{label}</button>)}
+              </div>}
+            </div>
+            {dashboardTab === 'ratings' ? (ratedAppointments.length === 0 ? <div className="alert alert-light border mb-0">No customer ratings yet. Customers can rate an appointment after you mark it finished.</div> : <div className="list-group list-group-flush">
+              {ratedAppointments.slice().sort((a, b) => new Date(b.appointmentDate) - new Date(a.appointmentDate)).map((appointment) => <article className="list-group-item px-0 py-3" key={appointment._id}>
+                <div className="d-flex justify-content-between gap-3"><strong>{appointment.customerId?.fullName || 'Customer'}</strong><span className="text-warning fw-bold" aria-label={`${appointment.rating} out of 5 stars`}>{'★'.repeat(appointment.rating)}{'☆'.repeat(5 - appointment.rating)} <span className="text-muted small">{appointment.rating}/5</span></span></div>
+                <div className="small text-muted">{new Date(`${new Date(appointment.appointmentDate).toISOString().slice(0, 10)}T00:00:00`).toLocaleDateString()} · {appointment.appointmentTime}</div>
+                {appointment.review && <p className="mb-0 mt-2">“{appointment.review}”</p>}
+              </article>)}
+            </div>) : visibleAppointments.length === 0 ? <div className="alert alert-light border mb-0">{appointmentFilter === 'approved' ? 'No confirmed appointments yet. Once an admin approves a request, it will appear here with a finish button.' : 'There are no appointments in this section.'}</div> : (
               <div className="table-responsive"><table className="table table-hover align-middle mb-0">
-                <thead><tr><th>Customer</th><th>Date</th><th>Time</th><th>Status</th><th>Action</th></tr></thead>
-                <tbody>{appointments.map((appointment) => <tr key={appointment._id}>
+                <thead><tr><th>Customer</th><th>Date</th><th>Time</th><th>Status</th><th>Action</th><th>Rating</th></tr></thead>
+                <tbody>{visibleAppointments.map((appointment) => <tr key={appointment._id}>
                   <td>{appointment.customerId?.fullName || 'Customer'}</td>
                   <td>{new Date(`${new Date(appointment.appointmentDate).toISOString().slice(0, 10)}T00:00:00`).toLocaleDateString()}</td>
                   <td>{appointment.appointmentTime}</td>
                   <td className="text-capitalize">{appointment.appointmentStatus}</td>
-                  <td>{appointment.appointmentStatus === 'pending' ? <span className="small text-muted">Waiting for admin review</span> : appointment.appointmentStatus === 'approved' ? <button className="btn btn-sm btn-outline-primary" onClick={() => changeStatus(appointment._id, 'completed')}>Mark complete</button> : null}</td>
+                  <td>{appointment.appointmentStatus === 'pending' ? <span className="small text-muted">Waiting for admin review</span> : appointment.appointmentStatus === 'approved' ? <button className="btn btn-sm btn-primary" disabled={finishingId === appointment._id} onClick={() => changeStatus(appointment._id, 'completed')}>{finishingId === appointment._id ? 'Saving…' : 'Mark finished'}</button> : appointment.appointmentStatus === 'completed' ? <span className="small text-success">Finished</span> : '—'}</td>
+                  <td>{appointment.rating ? <span className="text-warning" title={`${appointment.rating} out of 5`}>{'★'.repeat(appointment.rating)}{'☆'.repeat(5 - appointment.rating)}</span> : appointment.appointmentStatus === 'completed' ? <span className="small text-muted">Awaiting customer</span> : '—'}</td>
                 </tr>)}</tbody>
               </table></div>
             )}
